@@ -1,0 +1,52 @@
+platforms:
+- default
+- openshift
+blueprint:
+  openshift:
+    global:
+      resourceManager:
+        kubernetes:
+          cpuUnitsPerCore: 1.0
+output:
+  OptimizedConfiguration:
+    data-in: stage0.GenerateOptimizedConfiguration/molecule.inp:copy
+    description: '"ANI optimized configuration prepared for GAMESS single-point energy calculation"'
+    type: csv
+components:
+- stage: 0
+  name: GenerateOptimizedConfiguration 
+  command:
+    arguments: -scsv input_smiles.csv -rk %(key)s -ri %(molecule_index)s --ani_model %(ani_model)s -o %(optimizer)s 
+      --force_tolerance %(force_tolerance)s --ff_minimize %(ff_minimize)s -amac %(ani_minimize_all_conformers)s 
+      --test -og input_molecule.txt --n_conformers %(n_conformers)s --max_iterations %(max_iterations)s
+    environment: None
+    executable: bin/optimize_ani.py
+  references:
+  - input/input_smiles.csv:copy
+  - input/input_molecule.txt:copy
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+    kubernetes:
+      image: quay.io/st4sd/community-applications/ani-torch-st4sd:2.2.2
+variables:
+  default:
+    global:
+      molecule_index: 0
+      cpuUnitsPerCore: '1'
+      defaultq: normal
+      functional: "wB97X"
+      ani_model: "ani2x"
+      optimizer: "bfgs"
+      force_tolerance: 0.05
+      ff_minimize: 0
+      ani_minimize_all_conformers: 1
+      key: "smiles"
+      n_conformers: 50
+      max_iterations: 5000
+      backend: local
+  openshift:
+    global:
+      backend: kubernetes
+      gamess-version-number: '01'
+      number-processors: '1'

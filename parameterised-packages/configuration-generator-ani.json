@@ -1,0 +1,88 @@
+ {
+  "base": {
+    "packages": [
+      {
+        "config": {
+          "manifestPath": "manifest.yaml",
+          "path": "ani-surrogate.yaml"
+        },
+        "dependencies": {
+          "imageRegistries": []
+        },
+        "name": "main",
+        "source": {
+          "git": {
+            "location": {
+              "tag": "1.0.0",
+              "url": "https://github.com/st4sd/configuration-generator-ani.git"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "package": {
+      "description": "Surrogate that optimizes the geometry of a molecule using the ANI neural potential (ani2x, functional: vWB97x) and adds it to a GAMESS molecule.inp file",
+      "keywords": [
+        "smiles",
+        "computational chemistry",
+        "geometry-optimization",
+        "gamess",
+        "surrogate"
+      ],
+      "maintainer": "https://github.com/Jammyzx1",
+      "name": "configuration-generator-ani",
+      "tags": [
+        "latest",
+        "1.0.0"
+      ]
+    }
+  },
+  "parameterisation": {
+    "executionOptions": {
+      "data": [],
+      "platform": [],
+      "runtime": {
+        "args": [],
+        "resources": {}
+      },
+      "variables": [
+        {
+          "name": "molecule_index"
+        },
+        {
+          "name": "n_conformers"
+        },
+        {
+          "name": "max_iterations"
+        }
+      ]
+    },
+    "presets": {
+      "data": [],
+      "environmentVariables": [],
+      "platform": "openshift",
+      "runtime": {
+        "args": [
+          "--registerWorkflow=yes"
+        ],
+        "resources": {}
+      },
+      "variables": [
+        {
+          "name": "ani_model",
+          "value": "ani2x"
+        },
+        {
+          "name": "optimizer",
+          "value": "bfgs"
+        },
+        {
+          "name": "functional",
+          "value": "wB97X"
+        }
+      ]
+    }
+  }
+}
