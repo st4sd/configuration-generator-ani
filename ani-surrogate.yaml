@@ -1,52 +1,154 @@
+
+# Copyright IBM Inc. 2015, 2019. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Author(s):
+#   James McDonagh
+#   Michael Johnston
+#   Vassilis Vassiliadis
+
+
+status-report:
+  0:
+    arguments: '1'
+    executable: echo
+    stage-weight: 0.1
+  1:
+    arguments: '1'
+    executable: echo
+    stage-weight: 0.9
+
+
 platforms:
 - default
 - openshift
+- openshift-kubeflux
+
 blueprint:
-  openshift:
+  openshift-kubeflux:
     global:
       resourceManager:
         kubernetes:
-          cpuUnitsPerCore: 1.0
-output:
-  OptimizedConfiguration:
-    data-in: stage0.GenerateOptimizedConfiguration/molecule.inp:copy
-    description: '"ANI optimized configuration prepared for GAMESS single-point energy calculation"'
-    type: csv
+          podSpec:
+            schedulerName: kubeflux
+
+environments:
+  # Platforms that do not override the environments, use the ones that default defines
+  default:
+    PYTHON: {}
+
 components:
+  ## This component updates a general GAMESS US input file template to have a particular basis set
 - stage: 0
-  name: GenerateOptimizedConfiguration 
+  name: SetBasis
   command:
-    arguments: -scsv input_smiles.csv -rk %(key)s -ri %(molecule_index)s --ani_model %(ani_model)s -o %(optimizer)s 
-      --force_tolerance %(force_tolerance)s --ff_minimize %(ff_minimize)s -amac %(ani_minimize_all_conformers)s 
-      --test -og input_molecule.txt --n_conformers %(n_conformers)s --max_iterations %(max_iterations)s
-    environment: None
-    executable: bin/optimize_ani.py
+    arguments: sed -i'.bak' -e 's/#BASIS#/%(basis)s/g' input_molecule.txt
+    interpreter: bash
   references:
-  - input/input_smiles.csv:copy
-  - input/input_molecule.txt:copy
+  - data/input_molecule.txt:copy
+
+  ## This component updates a general GAMESS US input file template to have a particular functional
+- stage: 0
+  name: SetFunctional
+  command:
+    arguments: sed -i'.bak' -e 's/#FUNCTIONAL#/%(functional)s/g' input_molecule.txt
+    interpreter: bash
+  references:
+  - SetBasis/input_molecule.txt:copy
+
+  ## This gets the row number index to read for each replica
+- stage: 0
+  name: GetMoleculeIndex
+  command:
+    arguments: -c \"print(%(startIndex)s + %(replica)s),\"
+    executable: python
+  workflowAttributes:
+    replicate: '%(numberMolecules)s'
+
+  ## Note row is used to name the output sdf and xyz files used later make the input files. This will give each one a unique name
+  ## over the replicas here
+- stage: 0
+  name: SMILESToXYZ
+  command:
+    arguments: --input smiles.csv --row GetMoleculeIndex:output
+    environment: python
+    executable: bin/rdkit_smiles2coordinates.py
+  references:
+  - input/smiles.csv:copy
+  - GetMoleculeIndex:output
   resourceManager:
     config:
       backend: '%(backend)s'
     kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+
+  ## This runs a geometry optimization using ANI
+- stage: 0
+  name: GeometryOptimisationANI
+  command:
+    arguments: --xyz_path stage0.SMILESToXYZ:ref -xyz stage0.GetMoleculeIndex:output  
+      --ani_model %(ani-model)s -o bfgs -i %(iterations)s --temperature %(T)s 
+      --pressure %(P)s --force_tolerance %(force-tol)s --outname stage0.GetMoleculeIndex:output
+    environment: python
+    executable: bin/optimize_ani.py
+  references:
+    - stage0.SMILESToXYZ:ref
+    - stage0.GetMoleculeIndex:output
+  workflowAttributes:
+    shutdownOn:
+    - KnownIssue
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+      walltime: 700.0
+    kubernetes:
+      gracePeriod: 1800
       image: quay.io/st4sd/community-applications/ani-torch-st4sd:2.2.2
+  resourceRequest:
+    memory: '%(mem)s'
+    numberThreads: '%(number-processors)s'
+    threadsPerCore: 1
+
+- stage: 0
+  name: XYZToGAMESS
+  command:
+    arguments: -xp stage0.GeometryOptimisationANI:ref -xf stage0.GetMoleculeIndex:output 
+      -g stage0.SetFunctional:ref/input_molecule.txt -sp stage0.SMILESToXYZ:ref -sf stage0.GetMoleculeIndex:output
+    environment: python
+    executable: bin/rdkit_smiles2coordinates.py
+  references:
+  - stage0.GeometryOptimisationANI:ref
+  - stage0.SetFunctional:ref
+  - stage0.SMILESToXYZ:ref
+  - stage0.GetMoleculeIndex:output
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+    kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+
 variables:
   default:
     global:
-      molecule_index: 0
-      cpuUnitsPerCore: '1'
-      defaultq: normal
-      functional: "wB97X"
-      ani_model: "ani2x"
-      optimizer: "bfgs"
-      force_tolerance: 0.05
-      ff_minimize: 0
-      ani_minimize_all_conformers: 1
-      key: "smiles"
-      n_conformers: 50
-      max_iterations: 5000
+      # VV: References python script in hooks directory to use for restartHook of GeometryOptimisation
+      mem: '4295000000'
       backend: local
+      number-processors: '1'
+      startIndex: '0'
+      numberMolecules: '1'
+      basis: GBASIS=N31 NGAUSS=6 NDFUNC=2 NPFUNC=1 DIFFSP=.TRUE. DIFFS=.TRUE.
+      functional: B3LYP
+      ani-model: "ani2x"
+      force-tol: 0.005
+      iterations: 1000
+      # For thermochemistry
+      T: 298.15
+      P: 101325.0
+    stages:
+      0:
+        stage-name: SMILES_to_GAMESS
   openshift:
     global:
       backend: kubernetes
-      gamess-version-number: '01'
-      number-processors: '1'
+  openshift-kubeflux:
+    global:
+      backend: kubernetes
