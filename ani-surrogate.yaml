@@ -69,8 +69,9 @@ components:
   name: GeometryOptimisationANI
   command:
     arguments: --xyz_path stage0.SMILESToXYZ:ref -xyz stage0.GetMoleculeIndex:output  
-      --ani_model %(ani-model)s -o bfgs -i %(iterations)s --temperature %(T)s 
-      --pressure %(P)s --force_tolerance %(force-tol)s --outname stage0.GetMoleculeIndex:output
+      --ani_model %(ani-model)s -o bfgs -i %(iterations)s --temperature %(thermo-chem-T)s 
+      --pressure %(thermo-chem-P)s --force_tolerance %(force-tol)s -
+      -outname stage0.GetMoleculeIndex:output
     environment: python
     executable: bin/optimize_ani.py
   references:
@@ -125,8 +126,8 @@ variables:
       ani-walltime: 700
       ani-grace-period: 1800
       # For thermochemistry
-      T: 298.15
-      P: 101325.0
+      thermo-chem-T: 298.15
+      thermo-chem-P: 101325.0
     stages:
       0:
         stage-name: SMILES_to_GAMESS
