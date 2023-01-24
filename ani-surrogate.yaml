@@ -37,23 +37,6 @@ environments:
     PYTHON: {}
 
 components:
-  ## This component updates a general GAMESS US input file template to have a particular basis set
-- stage: 0
-  name: SetBasis
-  command:
-    arguments: sed -i'.bak' -e 's/#BASIS#/%(basis)s/g' input_molecule.txt
-    interpreter: bash
-  references:
-  - data/input_molecule.txt:copy
-
-  ## This component updates a general GAMESS US input file template to have a particular functional
-- stage: 0
-  name: SetFunctional
-  command:
-    arguments: sed -i'.bak' -e 's/#FUNCTIONAL#/%(functional)s/g' input_molecule.txt
-    interpreter: bash
-  references:
-  - SetBasis/input_molecule.txt:copy
 
   ## This gets the row number index to read for each replica
 - stage: 0
@@ -99,9 +82,9 @@ components:
   resourceManager:
     config:
       backend: '%(backend)s'
-      walltime: 700.0
+      walltime: "%(ani-walltime)s"
     kubernetes:
-      gracePeriod: 1800
+      gracePeriod: "%(ani-grace-period)s"
       image: quay.io/st4sd/community-applications/ani-torch-st4sd:2.2.2
   resourceRequest:
     memory: '%(mem)s'
@@ -112,12 +95,13 @@ components:
   name: XYZToGAMESS
   command:
     arguments: -xp stage0.GeometryOptimisationANI:ref -xf stage0.GetMoleculeIndex:output 
-      -g stage0.SetFunctional:ref/input_molecule.txt -sp stage0.SMILESToXYZ:ref -sf stage0.GetMoleculeIndex:output
+      -g input/input_molecule.txt:ref -sp stage0.SMILESToXYZ:ref 
+      -sf stage0.GetMoleculeIndex:output
     environment: python
-    executable: bin/rdkit_smiles2coordinates.py
+    executable: bin/make_gamess_input_from_template_and_xyz.py
   references:
   - stage0.GeometryOptimisationANI:ref
-  - stage0.SetFunctional:ref
+  - input/input_molecule.txt:ref
   - stage0.SMILESToXYZ:ref
   - stage0.GetMoleculeIndex:output
   resourceManager:
@@ -129,17 +113,17 @@ components:
 variables:
   default:
     global:
-      # VV: References python script in hooks directory to use for restartHook of GeometryOptimisation
       mem: '4295000000'
       backend: local
       number-processors: '1'
       startIndex: '0'
       numberMolecules: '1'
-      basis: GBASIS=N31 NGAUSS=6 NDFUNC=2 NPFUNC=1 DIFFSP=.TRUE. DIFFS=.TRUE.
-      functional: B3LYP
       ani-model: "ani2x"
       force-tol: 0.005
       iterations: 1000
+      # For ANI walltime (in minutes), gracePeriod (in seconds) (compatible with k8s backend)
+      ani-walltime: 700
+      ani-grace-period: 1800
       # For thermochemistry
       T: 298.15
       P: 101325.0
