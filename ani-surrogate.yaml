@@ -7,17 +7,6 @@
 #   Vassilis Vassiliadis
 
 
-status-report:
-  0:
-    arguments: '1'
-    executable: echo
-    stage-weight: 0.1
-  1:
-    arguments: '1'
-    executable: echo
-    stage-weight: 0.9
-
-
 platforms:
 - default
 - openshift
@@ -52,11 +41,11 @@ components:
 - stage: 0
   name: SMILESToXYZ
   command:
-    arguments: --input smiles.csv --row GetMoleculeIndex:output
+    arguments: --input input_smiles.csv --row GetMoleculeIndex:output
     environment: python
     executable: bin/rdkit_smiles2coordinates.py
   references:
-  - input/smiles.csv:copy
+  - input/input_smiles.csv:copy
   - GetMoleculeIndex:output
   resourceManager:
     config:
@@ -95,7 +84,7 @@ components:
 - stage: 0
   name: XYZToGAMESS
   command:
-    arguments: -xp stage0.GeometryOptimisationANI:ref -xf stage0.GetMoleculeIndex:output 
+    arguments: -xp stage0.GeometryOptimisationANI:ref -xf stage0.GetMoleculeIndex:output
       -g input/input_molecule.txt:ref -sp stage0.SMILESToXYZ:ref 
       -sf stage0.GetMoleculeIndex:output
     environment: python
