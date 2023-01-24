@@ -59,8 +59,8 @@ components:
   command:
     arguments: --xyz_path stage0.SMILESToXYZ:ref -xyz stage0.GetMoleculeIndex:output  
       --ani_model %(ani-model)s -o bfgs -i %(iterations)s --temperature %(thermo-chem-T)s 
-      --pressure %(thermo-chem-P)s --force_tolerance %(force-tol)s -
-      -outname stage0.GetMoleculeIndex:output
+      --pressure %(thermo-chem-P)s --force_tolerance %(force-tol)s
+      --outname stage0.GetMoleculeIndex:output
     environment: python
     executable: bin/optimize_ani.py
   references:
