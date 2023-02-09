@@ -13,8 +13,8 @@
         "source": {
           "git": {
             "location": {
-              "tag": "1.1.0",
-              "url": "https://github.com/st4sd/configuration-generator-ani.git"
+              "tag": "vv_modular",
+              "url": "https://github.com/VassilisVassiliadis/configuration-generator-ani.git"
             }
           }
         }
@@ -48,9 +48,6 @@
         "resources": {}
       },
       "variables": [
-        {
-          "name": "molecule_index"
-        },
         {
           "name": "ani-walltime"
         },

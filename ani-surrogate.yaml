@@ -123,6 +123,9 @@ variables:
   openshift:
     global:
       backend: kubernetes
+  openshift-cpu:
+    global:
+      backend: kubernetes
   openshift-kubeflux:
     global:
       backend: kubernetes
