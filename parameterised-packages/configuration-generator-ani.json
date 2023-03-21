@@ -13,7 +13,7 @@
         "source": {
           "git": {
             "location": {
-              "tag": "1.0.0",
+              "tag": "1.1.0",
               "url": "https://github.com/st4sd/configuration-generator-ani.git"
             }
           }
@@ -35,7 +35,7 @@
       "name": "configuration-generator-ani",
       "tags": [
         "latest",
-        "1.0.0"
+        "1.1.0"
       ]
     }
   },
@@ -49,13 +49,22 @@
       },
       "variables": [
         {
-          "name": "molecule_index"
+          "name": "ani-walltime"
         },
         {
-          "name": "n_conformers"
+          "name": "ani-grace-period"
         },
         {
-          "name": "max_iterations"
+          "name": "force-tol"
+        },
+        {
+          "name": "iterations"
+        },
+        {
+          "name": "thermo-chem-T"
+        },
+        {
+          "name": "thermo-chem-P"
         }
       ]
     },
@@ -65,22 +74,15 @@
       "platform": "openshift",
       "runtime": {
         "args": [
-          "--registerWorkflow=yes"
+          "--registerWorkflow=yes",
+          "--failSafeDelays=no"
         ],
         "resources": {}
       },
       "variables": [
         {
-          "name": "ani_model",
+          "name": "ani-model",
           "value": "ani2x"
-        },
-        {
-          "name": "optimizer",
-          "value": "bfgs"
-        },
-        {
-          "name": "functional",
-          "value": "wB97X"
         }
       ]
     }

@@ -22,6 +22,8 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
+# !/usr/bin/env python
+
 # python packages
 import argparse
 import logging
@@ -104,6 +106,7 @@ def setup_logger(cwd, loglev="INFO"):
     log.info('Started {}\n'.format(datetime.now()))
 
     return log
+
 
 def sample_conformations(mol, n_conformers, r_seed=17591, RMS=False):
     """
@@ -188,7 +191,7 @@ def get_mol_from_smiles(smiles, canonicalize=True):
     log = logging.getLogger(__name__)
 
     if canonicalize is True:
-        s = Chem.CanonSmiles(smiles, useChiral=1)
+        s = Chem.CanonSmiles(smiles, useChiral=True)
     else:
         s = smiles
     mol = Chem.MolFromSmiles(s)
@@ -211,7 +214,7 @@ def smi2coordinates(smi, n_conformers=25, random_seed=17591, minimize=True):
 
     if n_conformers > 0:
         sample_conformations(mol_with_h, n_conformers, r_seed=random_seed)
-    
+
     if minimize is True:
         indx = energy_minimize_all_confs(mol_with_h)
     else:
@@ -331,7 +334,7 @@ def test_ani():
 
     force_matches = torch.isclose(force, expected_force, rtol=5e-05, atol=5e-05)
     log.info("Force:\n{}\n\nshould be\n{}\n\ntolerance: {}".format(force, expected_force, 5e-05+5e-05))
-    log.info("\nForce as expected: {}\n".format(force_matches)) 
+    log.info("\nForce as expected: {}\n".format(force_matches))
 
     return True
 
@@ -339,9 +342,20 @@ def ase_read_xyz(xyz_filename, fmt="xyz"):
     """
     Function to use ASE to read a molecule from an xyz file
     :param xyz_filename: str - filename and path
-    :param fmt: str - file format 
+    :param fmt: str - file format
     """
     return aseio.read(xyz_filename, format=fmt, do_not_split_by_at_sign=False)
+
+
+def ase_write_xyz(atoms, xyz_filename, fmt="xyz"):
+    """
+    Function to use ASE to read a molecule from an xyz file
+    :param atoms: ase atoms or list of atoms
+    :param xyz_filename: str - filename and path
+    :param fmt: str - file format
+    """
+    return aseio.write(xyz_filename, atoms, format=fmt, comment="optimized xyz with ANI")
+
 
 def linear(atoms, threshold=1E-4):
     """
@@ -353,8 +367,9 @@ def linear(atoms, threshold=1E-4):
     a0 = atoms[0]
     angles = []
     i = 0
-    while i+2 < len(atoms):
-        angles.append(atoms.get_angle(i, i+1, i+2, mic=True))
+    while i + 2 < len(atoms):
+        # save angles in deg from the ASE
+        angles.append(atoms.get_angle(i, i + 1, i + 2, mic=True))
         i = i + 1
 
     log.debug("Angles:\n{}".format(angles))
@@ -401,7 +416,7 @@ def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, cha
     log = logging.getLogger(__name__)
     mf = rdMolDescriptors.CalcMolFormula(mol)
     coordinates = xyz(mol, n_conf=indx)
-    atomic_masses = ["{:.1f}".format(round(atom.GetAtomicNum(),0)) for atom in mol.GetAtoms()]
+    atomic_masses = ["{:.1f}".format(round(atom.GetAtomicNum(), 0)) for atom in mol.GetAtoms()]
     log.info("Atomic mass: {}".format(atomic_masses))
     coordinates.insert(loc=1, column="masses", value=atomic_masses)
     coords_csv = coordinates.to_csv(header=False, index=False, sep=" ")
@@ -444,7 +459,7 @@ def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, cha
 
             fout.write(" {}\n".format(line.strip()))
 
-        #fout.write("\n")
+        # fout.write("\n")
         fout.write(" $DATA\n")
         fout.write("{} {}\n".format(name, re.sub(r"[^\w]", "", mf)))
         fout.write(" C1\n")
@@ -507,33 +522,28 @@ def run():
         parser = argparse.ArgumentParser(description="Command line binary points script",
                                          usage=usage, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-        parser.add_argument("-xyz", "--xyz_file", metavar="FILEPATH",
+        parser.add_argument("-xyz", "--xyz_file", metavar="FILE",
                             action="store", help="xyz file to read",
                             default="none")
-        parser.add_argument("-scsv", "--smiles_csv_file", metavar="FILEPATH",
-                            action="store", help="csv file to read one per line",
-                            default="none")
-        parser.add_argument("-icsv", "--inchi_csv_file", metavar="FILEPATH",
-                            action="store", help="csv file to read one per line",
-                            default="none")
-        parser.add_argument("-rk", "--representation_key", metavar="STR",
-                            action="store", help="column key in the csv file to read smiles from (case insensitive)",
-                            default="smiles")
-        parser.add_argument("-ri", "--representation_index", metavar="INT", type=int,
-                            action="store", help="Row index from the csv for the smiles to run",
-                            default=0)
+
+        parser.add_argument("-xyzp", "--xyz_path", metavar="PATH",
+                            action="store", help="The path to the xyz file to read",
+                            default=os.getcwd())
 
         parser.add_argument("-m", "--ani_model", metavar="STR",
-                            action="store", help="ANI model choice of ani1 for ANI1X, ani2 for ANI2X and anicc for ANI1ccx", 
+                            action="store",
+                            help="ANI model choice of ani1 for ANI1X, ani2 for ANI2X and anicc for ANI1ccx",
                             default="ani2")
         parser.add_argument("-i", "--max_iterations", metavar="INT",
-                            action="store", help="maximum number of times ASE can iterate over the optimzation using ANI", type=int,
+                            action="store",
+                            help="maximum number of times ASE can iterate over the optimzation using ANI", type=int,
                             default=5000)
         parser.add_argument("-o", "--optimizer", metavar="STR",
                             action="store", help="optimizer for the run one of bfgs, lbfgs, gp, fire, mdmin", type=str,
                             default="bfgs")
         parser.add_argument("--history_file", metavar="STR",
-                            action="store", help="filename to store the optimization trajectory information to", type=str,
+                            action="store", help="filename to store the optimization trajectory information to",
+                            type=str,
                             default='trajectory.traj')
         parser.add_argument("--restart_file", metavar="STR",
                             action="store", help="filename to store the optimization restart data to", type=str,
@@ -550,23 +560,15 @@ def run():
         parser.add_argument("--force_tolerance",
                             action="store", help="optimizer force tolerance",
                             type=float, default=0.05)
-        parser.add_argument("--n_conformers", action="store", default=50, type=int,
-                          help="Number of chemical conformtions to consider")
-        parser.add_argument("--ff_minimize", type=int,
-                            action="store", help="Use a force field to pre-optimize",
-                            default=1)
-        parser.add_argument("-amac", "--ani_minimize_all_conformers", type=int,
-                            action="store", help="Use ani to optimize all conformers",
-                            default=1)
-        parser.add_argument("-og", "--output_gamess_template", type=str,
-                            action="store", help="output gamess input file from template",
-                            default=None)
         parser.add_argument("--spin", type=str,
                             action="store", help="molecules spin (multiplicity)",
                             default=None)
         parser.add_argument("--charge", type=str,
                             action="store", help="molecules charge state",
                             default=None)
+        parser.add_argument("--outname", type=str,
+                            action="store", help="name to save optimized molecules xyz file to",
+                            default="opt")
         parser.add_argument("--loglev", action="store", default="INFO", help="log level")
 
         op = parser.parse_args()
@@ -583,37 +585,29 @@ def run():
 
     log.info("Command line input =\n\t{}".format(op))
 
-    # Clean and set up minimzation variables for conformations
-    op.ff_minimize = bool(op.ff_minimize)
-    op.ani_minimize_all_conformers = bool(op.ani_minimize_all_conformers)
+    # check for extension to xyz
+    if op.xyz_file[-4:] != ".xyz":
+        op.xyz_file = op.xyz_file + ".xyz"
 
-    log.info("optimize conformers: UFF {} ANI {}".format(op.ff_minimize, op.ani_minimize_all_conformers))
-    
+    # Check if the file path is given if it is prepend it to the file name
+    if op.xyz_path.lower() != "none":
+        op.xyz_file = os.path.join(op.xyz_path, op.xyz_file)
+
+    # print the file name
+    log.info("Reading the xyz file {}".format(op.xyz_file))
+
     # Enable flow variable of str None to be interpreted as python None
     if op.spin is not None:
         if op.spin.lower().strip() == "none":
             op.spin = None
-    
+
     if op.charge is not None:
         if op.charge.lower().strip() == "none":
             op.charge = None
 
-    if op.ani_minimize_all_conformers is True and op.ff_minimize is True:
-        log.warning("Both Force field and ani conformation minimization was asked for will run the force field then ani conformation minimization")
-     
-    log.info("\nMinimize with force field before ani? {}".format(op.ff_minimize))
-    log.info("Minimize all conformers with ani? {}".format(op.ani_minimize_all_conformers))
-    log.info("Only one of the above should be true\n")
-
     # For flow input
     if op.xyz_file.lower() == "none":
         op.xyz_file = None
-
-    if op.smiles_csv_file.lower() == "none":
-        op.smiles_csv_file = None
-    
-    if op.inchi_csv_file.lower() == "none":
-        op.inchi_csv_file = None
 
     # Run ASE and ANI test for consistency
     if op.test is True:
@@ -625,131 +619,60 @@ def run():
 
     # Read in or create the molecule
     molecule = None
+
     if op.xyz_file is not None:
+        log.info("XYZ file geometry used instead of RDKit from smiles")
         molecule = ase_read_xyz(op.xyz_file)
-    elif op.smiles_csv_file is not None:
-        df = pd.read_csv(op.smiles_csv_file, header=0)
-        df.columns = [ent.lower() for ent in df.columns]
-        smiles = df[op.representation_key].values[op.representation_index]
-        log.info("Input is SMILES: {}".format(smiles))
-        mol, indx = smi2coordinates(smiles, n_conformers=op.n_conformers, minimize=op.ff_minimize)
-        log.info("RDKit minimized molecule conformer indx {}".format(indx))
-        xyz_representation(mol, indx)
-        molecule = ase_read_xyz("rdkit_min_conformer.xyz")
-    elif op.inchi_csv_file is not None:
-        df = pd.read_csv(op.inchi_csv_file, header=0)
-        df.columns = [ent.lower() for ent in df.columns]
-        inchi = df[op.representation_key].values[op.representation_index]
-        log.info("Input is InChI: {}".format(inchi))
-        mol, indx = inchi2coordinates(inchi, n_conformers=op.n_conformers, minimize=op.ff_minimize)
-        log.info("RDKit minimized molecule conformer indx {}".format(indx))
-        xyz_representation(mol, indx)
-        molecule = ase_read_xyz("rdkit_min_conformer.xyz")
 
     # Get the ANI calculator object from ASE
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = None
     if op.ani_model.lower() == "ani1":
         log.info("ANI model 1 will be used for potential energy evaluation")
-        model = torchani.models.ANI1x(periodic_table_index=True).ase() #.to(device)
+        model = torchani.models.ANI1x(periodic_table_index=True).to(device).ase()
     elif op.ani_model.lower() == "anicc":
         log.info("ANI model CCX will be used for potential energy evaluation")
-        model = torchani.models.ANI1ccx(periodic_table_index=True).ase() #.to(device)
+        model = torchani.models.ANI1ccx(periodic_table_index=True).to(device).ase()
     elif op.ani_model.lower():
         log.info("ANI model 2 will be used for potential energy evaluation")
-        model = torchani.models.ANI2x(periodic_table_index=True).ase() #.to(device)
+        model = torchani.models.ANI2x(periodic_table_index=True).to(device).ase()
     else:
         log.warning("Unrecognised ANI model asked for {}. Using defualt ANI2X".format(op.ani_model))
-        model = torchani.models.ANI2x(periodic_table_index=True).ase() #.to(device)
-    
+        model = torchani.models.ANI2x(periodic_table_index=True).to(device).ase()
 
-    ###### ------------------ Method decision point ------------------- #####
-
-    # If we use the force field to pre-optimze then we can just run one ANI optimzation (fastest)
-    if op.ani_minimize_all_conformers is False:
-        # Build the molecule and calculator object system - NOTE molecule is the minimized geometry from RDKit above
-        if molecule is not None and model is not None:
-            system = Atoms(molecule, calculator=model)
-        else:
-            log.warning("Model or molecule is not set exiting as computer says no :( ..........")
-            raise UserError
-
-        # object optimizer with history and restart fule writing NOTE: will automatically use restart files if they are present
-        if op.optimizer.lower() == "bfgs":
-            log.info("Optimizing with BFGS")
-            opt = BFGS(system, trajectory=op.history_file, restart=op.restart_file)
-        elif op.optimizer.lower() == "lbfgs":
-            log.info("Optimizing with LBFGS")
-            opt = LBFGS(system, trajectory=op.history_file, restart=op.restart_file)
-        elif op.optimizer.lower() == "gp":
-            log.info("Optimizing with GP")
-            opt = GPMin(system, trajectory=op.history_file, restart=op.restart_file)
-        elif op.optimizer.lower() == "fire":
-            log.info("Optimizing with FIRE MD")
-            opt = FIRE(system, trajectory=op.history_file, restart=op.restart_file)
-        elif op.optimizer.lower() == "mdmin":
-            log.info("Optimizing with MD")
-            opt = MDMin(system, trajectory=op.history_file, restart=op.restart_file)
-
-        # Run the optimization
-        opt.run(fmax=op.force_tolerance, steps=op.max_iterations)
-        min_energy = system.get_potential_energy()
-        log.info("Energy minimized: {}".format(min_energy))
-        conf = mol.GetConformer(id=indx)
-        for ith, ent in enumerate(system.get_positions()):
-            conf.SetAtomPosition(ith, Point3D(*ent))
-        
-    # Other wise use ani to optimize all conformers and take the lowest energy as the ground state
+    # Build the molecule and calculator object system - NOTE molecule is the minimized geometry from RDKit above
+    if molecule is not None and model is not None:
+        system = Atoms(molecule, calculator=model)
     else:
-        elements = get_elements(mol)
-        min_energies = []
-        for i, conf in enumerate(mol.GetConformers()):
-            log.info("Minimizing conformer {}".format(i))
+        log.warning("Model or molecule is not set exiting as computer says no :( ..........")
+        raise UserError
 
-            # Build the molecule and calculator object system
-            if molecule is not None and model is not None:
-                xyzcoords = get_coordinates(conf)
-                system = Atoms(positions=xyzcoords, symbols=elements, calculator=model)
-            else:
-                log.warning("Model or molecule is not set exiting as computer says no :( ..........") 
-                raise UserError
+    # object optimizer with history and restart file writing NOTE: will automatically use restart files if they are present
+    if op.optimizer.lower() == "bfgs":
+        log.info("Optimizing with BFGS")
+        opt = BFGS(system, trajectory=op.history_file, restart=op.restart_file)
+    elif op.optimizer.lower() == "lbfgs":
+        log.info("Optimizing with LBFGS")
+        opt = LBFGS(system, trajectory=op.history_file, restart=op.restart_file)
+    elif op.optimizer.lower() == "gp":
+        log.info("Optimizing with GP")
+        opt = GPMin(system, trajectory=op.history_file, restart=op.restart_file)
+    elif op.optimizer.lower() == "fire":
+        log.info("Optimizing with FIRE MD")
+        opt = FIRE(system, trajectory=op.history_file, restart=op.restart_file)
+    elif op.optimizer.lower() == "mdmin":
+        log.info("Optimizing with MD")
+        opt = MDMin(system, trajectory=op.history_file, restart=op.restart_file)
 
-            # object optimizer with history and restart fule writing NOTE: will automatically use restart files if they are present
-            if op.optimizer.lower() == "bfgs":
-                log.info("Optimizing with BFGS")
-                opt = BFGS(system, trajectory=op.history_file, restart=op.restart_file)
-            elif op.optimizer.lower() == "lbfgs":
-                log.info("Optimizing with LBFGS")
-                opt = LBFGS(system, trajectory=op.history_file, restart=op.restart_file)
-            elif op.optimizer.lower() == "gp":
-                log.info("Optimizing with GP")
-                opt = GPMin(system, trajectory=op.history_file, restart=op.restart_file)
-            elif op.optimizer.lower() == "fire":
-                log.info("Optimizing with FIRE MD")
-                opt = FIRE(system, trajectory=op.history_file, restart=op.restart_file)
-            elif op.optimizer.lower() == "mdmin":
-                log.info("Optimizing with MD")
-                opt = MDMin(system, trajectory=op.history_file, restart=op.restart_file)
+    # Run the optimization
+    opt.run(fmax=op.force_tolerance, steps=op.max_iterations)
+    min_energy = system.get_potential_energy()
+    log.info("Energy minimized: {} eV".format(min_energy))
+    ase_write_xyz(system, xyz_filename="{}.xyz".format(op.outname))
 
-            # Run the optimization
-            opt.run(fmax=op.force_tolerance, steps=op.max_iterations)
-            min_energies.append(system.get_potential_energy())
-            log.info("Energy minimized: {}".format(min_energies[-1]))
-
-            for ith, ent in enumerate(system.get_positions()):
-                conf.SetAtomPosition(ith, Point3D(*ent))
-
-        indx = np.argmin(min_energies)
-
-        log.info("Min energies:\n{}\Lowest energy index:\n{} {}".format(min_energies, indx, min_energies[indx]))
-        min_energy = min_energies[indx]
-        conf = mol.GetConformer(id=int(indx))
-        xyzcoords = get_coordinates(conf)
-        system = Atoms(positions=xyzcoords, symbols=elements, calculator=model)
-            
     # Run a vibrational analysis
     linear_molecule = linear(system)
-    log.info("Linear molecules? {}".format(linear_molecule))
+    log.info("Is the molecule likely linear? {}".format(linear_molecule))
     vib = Vibrations(system)
     vib.run()
 
@@ -757,19 +680,19 @@ def run():
     log.info("Vibrational frequencies:\n")
     log.info(frequencies)
     vib.summary()
-    log.info("\n 3N-6 will be vibrations other are rotations and " \
-    "translations for non-linear molecules 3N-5 for linear, other than those none should be negative for a minima")
+    log.info("\n 3N-6 will be vibrations other are rotations and "
+             "translations for non-linear molecules 3N-5 for linear, other than those none should be negative for a minima")
 
     # Run thermochemistry analysis
     log.info("Thermochemistry analysis starting .....")
     try:
-        frequencies_energy = vib.get_energies()   
+        frequencies_energy = vib.get_energies()
         thermo = IdealGasThermo(vib_energies=frequencies_energy,
-                        potentialenergy=min_energy,
-                        atoms=system,
-                        geometry='linear',
-                        symmetrynumber=1,
-                        spin=0)
+                                potentialenergy=min_energy,
+                                atoms=system,
+                                geometry='linear',
+                                symmetrynumber=1,
+                                spin=0)
 
         G = thermo.get_gibbs_energy(temperature=op.temperature, pressure=op.pressure)
         H = thermo.get_enthalpy(temperature=op.temperature)
@@ -779,9 +702,9 @@ def run():
         aseio.write("optimized.xyz", system, format="xyz", comment="No negative frequencies")
         with open("energies.csv", "w") as fout:
             fout.write("energy_au,negative_frequencies,G,H,S\n")
-            fout.write("{:.5f},False,{:.5f},{:.5f},{:.5f}\n".format(min_energy, G, H, S)) 
+            fout.write("{:.5f},False,{:.5f},{:.5f},{:.5f}\n".format(min_energy, G, H, S))
 
-    except ValueError as verr: 
+    except ValueError as verr:
         log.warning("{} Thermochemistry analysis is not avaliable".format(verr))
 
         # Write output files
@@ -789,12 +712,6 @@ def run():
         with open("energies.csv", "w") as fout:
             fout.write("energy_au,negative_frequencies,G,H,S\n")
             fout.write("{:.5f},True,NaN,NaN,Nan\n".format(min_energy))
-
-    if op.output_gamess_template is not None:
-        molecular_formula = Chem.rdMolDescriptors.CalcMolFormula(mol)
-        gamess_input_from_template(mol, smiles, molecular_formula, op.output_gamess_template, 
-                indx=int(indx), spin=op.spin, charge=op.charge)
-
 
 
 if __name__ == "__main__":
