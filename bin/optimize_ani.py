@@ -46,15 +46,16 @@ from ase import Atoms
 import torch
 import torchani
 
-# RDKit
+#RDKit
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import rdMolDescriptors, Descriptors
 from rdkit.Geometry.rdGeometry import Point3D
 
+
 __version__ = "0.1"
 __authors__ = "James L. McDonagh"
-__contact__ = "james.mcdonagh@uk.ibm.com"
+__contact__ = "https://github.com/Jammyzx1"
 __title__ = os.path.basename(__file__)
 __copyright__ = "Copyright IBM Corp. 2020"
 
@@ -116,16 +117,15 @@ def sample_conformations(mol, n_conformers, r_seed=17591, RMS=False):
     """
 
     if RMS is False:
-        conformer_index = AllChem.EmbedMultipleConfs(mol, numConfs=n_conformers, numThreads=0, randomSeed=r_seed)
+        conformer_index = AllChem.EmbedMultipleConfs(mol, numConfs=n_conformers, numThreads=0,randomSeed=r_seed)
 
     else:
         conformer_index = AllChem.EmbedMultipleConfs(mol, numConfs=n_conformers, numThreads=0,
-                                                     randomSeed=r_seed, maxAttempts=10000, pruneRmsThresh=0.25)
+                                                 randomSeed=r_seed, maxAttempts=10000, pruneRmsThresh=0.25)
     # options to give above to only accept based on RMS thresh and max attempts maxAttempts=10000, pruneRmsThresh=0.25
 
     Chem.rdMolTransforms.CanonicalizeMol(mol, ignoreHs=False)
     return list(conformer_index)
-
 
 def energy_minimize_all_confs(mol, max_int=2000):
     """
@@ -147,6 +147,7 @@ def energy_minimize_all_confs(mol, max_int=2000):
         result = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=max_int, numThreads=0,
                                                   ignoreInterfragInteractions=False)
 
+
     converged = [ent[0] for ent in result]
     energies = [ent[1] for ent in result]
 
@@ -158,7 +159,7 @@ def energy_minimize_all_confs(mol, max_int=2000):
     else:
         log.info("Energy minimization of all conformers successful")
         log.info("Minimized energy: {}\n".format(*["conformer {}: Energy {} Hartree\n".format(i, energy) for i,
-        energy in enumerate(energies)]))
+                                                                                    energy in enumerate(energies)]))
 
     # Find lowest energy conformer
     min_ener = 0.0
@@ -179,7 +180,6 @@ def energy_minimize_all_confs(mol, max_int=2000):
              "energy {}".format(indx, min_ener))
 
     return indx
-
 
 def get_mol_from_smiles(smiles, canonicalize=True):
     """
@@ -202,7 +202,6 @@ def get_mol_from_smiles(smiles, canonicalize=True):
 
     return mol
 
-
 def smi2coordinates(smi, n_conformers=25, random_seed=17591, minimize=True):
     """
     smiles to 3D coordinates
@@ -223,7 +222,6 @@ def smi2coordinates(smi, n_conformers=25, random_seed=17591, minimize=True):
 
     return mol_with_h, indx
 
-
 def inchi2coordinates(inchi, n_conformers=25, random_seed=17591, minimize=True):
     """
     smiles to 3D coordinates
@@ -243,7 +241,6 @@ def inchi2coordinates(inchi, n_conformers=25, random_seed=17591, minimize=True):
         indx = 0
 
     return mol_with_h, indx
-
 
 def xyz_representation(molecule, n_conf=-1, smiles=None):
     """
@@ -276,7 +273,6 @@ def xyz_representation(molecule, n_conf=-1, smiles=None):
             fout.write("From RDKit generated on {}: Molecule: {}\n".format(datetime.now(), mf))
         atomic_positions.to_csv(fout, header=None, index=None, sep=" ", mode="a")
 
-
 def xyz(molecule, n_conf=-1):
     """
     Get elements and atomic coordinates
@@ -301,7 +297,6 @@ def xyz(molecule, n_conf=-1):
 
     return atomic_positions
 
-
 def test_ani():
     """
     Function to test ani install is consistent
@@ -313,11 +308,11 @@ def test_ani():
     model = torchani.models.ANI2x(periodic_table_index=True).to(device)
 
     coordinates = torch.tensor([[[0.03192167, 0.00638559, 0.01301679],
-                                 [-0.83140486, 0.39370209, -0.26395324],
-                                 [-0.66518241, -0.84461308, 0.20759389],
-                                 [0.45554739, 0.54289633, 0.81170881],
-                                 [0.66091919, -0.16799635, -0.91037834]]],
-                               requires_grad=True, device=device)
+        [-0.83140486, 0.39370209, -0.26395324],
+        [-0.66518241, -0.84461308, 0.20759389],
+        [0.45554739, 0.54289633, 0.81170881],
+        [0.66091919, -0.16799635, -0.91037834]]],
+        requires_grad=True, device=device)
 
     species = torch.tensor([[6, 1, 1, 1, 1]], device=device)
     energy = model((species, coordinates)).energies
@@ -327,20 +322,21 @@ def test_ani():
     energy_same = True if 40.459790705366636 - abs(energy.item()) <= 1E-6 else False
     log.info("Energy: {} should be -40.459790705366636".format(energy.item))
     log.info("Energy as expected: {}".format(energy_same))
-    # Energy: -40.459790705366636
+    #Energy: -40.459790705366636
 
-    expected_force = torch.Tensor([[0.0478, -0.1304, -0.0551],
-                                   [-0.1353, 0.1581, -0.0776],
-                                   [0.0804, -0.0388, 0.0387],
-                                   [0.0254, 0.0076, 0.0433],
-                                   [-0.0183, 0.0035, 0.0508]])
+
+
+    expected_force = torch.Tensor([[ 0.0478, -0.1304, -0.0551],
+        [-0.1353,  0.1581, -0.0776],
+        [ 0.0804, -0.0388,  0.0387],
+        [ 0.0254,  0.0076,  0.0433],
+        [-0.0183,  0.0035,  0.0508]])
 
     force_matches = torch.isclose(force, expected_force, rtol=5e-05, atol=5e-05)
-    log.info("Force:\n{}\n\nshould be\n{}\n\ntolerance: {}".format(force, expected_force, 5e-05 + 5e-05))
+    log.info("Force:\n{}\n\nshould be\n{}\n\ntolerance: {}".format(force, expected_force, 5e-05+5e-05))
     log.info("\nForce as expected: {}\n".format(force_matches))
 
     return True
-
 
 def ase_read_xyz(xyz_filename, fmt="xyz"):
     """
@@ -385,7 +381,6 @@ def linear(atoms, threshold=1E-4):
         log.debug("Difference in angle deg:\n{}".format(diffs))
         return False
 
-
 def get_elements(mol):
     """
     Function to get the element symbols from an RDKit molecule object
@@ -393,7 +388,6 @@ def get_elements(mol):
     """
 
     return [atom.GetSymbol() for atom in mol.GetAtoms()]
-
 
 def get_coordinates(conf):
     """
@@ -407,7 +401,6 @@ def get_coordinates(conf):
         xyzcoords.append([coords.x, coords.y, coords.z])
 
     return xyzcoords
-
 
 def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, charge=None):
     """
@@ -477,7 +470,6 @@ def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, cha
 
     return out_filename
 
-
 def count_electons(mol, indx=-1):
     """
     This is a function to count the total number of electrons in a molecule and the number of valence electrons
@@ -519,7 +511,6 @@ def count_electons(mol, indx=-1):
     log.info("Spin state is {}\n--------------------------\n".format(spin))
 
     return [total_charge, spin, number_of_valence_electrons, number_of_electrons, radical]
-
 
 def run():
     """
@@ -569,9 +560,6 @@ def run():
         parser.add_argument("--force_tolerance",
                             action="store", help="optimizer force tolerance",
                             type=float, default=0.05)
-        parser.add_argument("-og", "--output_gamess_template", type=str,
-                            action="store", help="output gamess input file from template",
-                            default=None)
         parser.add_argument("--spin", type=str,
                             action="store", help="molecules spin (multiplicity)",
                             default=None)
@@ -724,11 +712,6 @@ def run():
         with open("energies.csv", "w") as fout:
             fout.write("energy_au,negative_frequencies,G,H,S\n")
             fout.write("{:.5f},True,NaN,NaN,Nan\n".format(min_energy))
-
-    if op.output_gamess_template is not None:
-        molecular_formula = Chem.rdMolDescriptors.CalcMolFormula(mol)
-        gamess_input_from_template(mol, smiles, molecular_formula, op.output_gamess_template,
-                                   indx=int(indx), spin=op.spin, charge=op.charge)
 
 
 if __name__ == "__main__":
